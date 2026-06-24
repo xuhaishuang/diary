@@ -67,6 +67,10 @@ canvas{display:block}
 <div style="display:flex;justify-content:space-between;align-items:center">
 <h3>📖 日记本</h3><button class="btn-close" id="d-close">✕</button>
 </div>
+<div id="token-setup" style="font-size:11px;color:#8B7355;padding:6px 10px;background:#FFFBF0;border-radius:8px;display:none">
+☁️ 云端同步未启用 &nbsp;<input id="token-inp" placeholder="粘贴GitHub Token" style="font-size:11px;padding:3px 8px;border:1px solid #E8D5C8;border-radius:6px;width:180px">&nbsp;<button id="token-btn" style="font-size:11px;padding:3px 10px;background:#7CB342;color:#fff;border:none;border-radius:6px;cursor:pointer">启用</button>
+</div>
+<div id="token-ok" style="font-size:11px;color:#7CB342;padding:6px 10px;background:#F0FFF0;border-radius:8px;display:none">☁️ 云端同步已启用 ✅</div>
 <div class="author-row">
 <span style="font-size:12px;color:#8B7355">记录人：</span>
 <button class="author-btn sh on" id="a-sh">🌸 双双</button>
@@ -366,8 +370,9 @@ document.addEventListener('keyup',function(e){
 
 // ============ 日记系统 ============
 const DKEY='sakura_diary_v1';
-const GH_TOKEN=''; // 留空则不启用云端同步，仅用本地存储
+let GH_TOKEN=localStorage.getItem('gh_token')||'';
 const GH_API='https://api.github.com/repos/xuhaishuang/diary/contents/room-diary.json';
+function setToken(tk){GH_TOKEN=tk;localStorage.setItem('gh_token',tk);if(tk)loadDiary()}
 
 let diaryData={entries:[]};
 let entryId=null;
@@ -410,7 +415,13 @@ function updateAuthorBtns(){
 function openDiary(){
   if(diaryOpen)return;diaryOpen=true;
   controls.unlock();newEntry();$('diary-panel').classList.add('open');
+  if(GH_TOKEN){$('token-setup').style.display='none';$('token-ok').style.display='block'}
+  else{$('token-setup').style.display='block';$('token-ok').style.display='none'}
 }
+$('token-btn').addEventListener('click',function(){
+  var tk=$('token-inp').value.trim();if(!tk)return;
+  setToken(tk);$('token-setup').style.display='none';$('token-ok').style.display='block';
+});
 
 function closeDiary(){
   diaryOpen=false;$('diary-panel').classList.remove('open');
