@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日记本</title>
+<style>
+:root{
+  --cover:#1a2240;--paper:#f5f4f8;--paper-r:#f0eff5;--ink:#1e2240;
+  --grey:#6e7088;--line:#dcdae8;--silver:#8890b8;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:'PingFang SC','Noto Serif SC','Microsoft YaHei',serif;
+  background:radial-gradient(ellipse at 50% 60%,#1a1e30 0%,#0a0c18 100%);
+  height:100vh;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+
+.stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.star{position:absolute;background:white;border-radius:50%;animation:twinkle ease-in-out infinite;}
+@keyframes twinkle{0%,100%{opacity:0.15;transform:scale(1);}30%{opacity:1;transform:scale(2);}60%{opacity:0.4;transform:scale(1.3);}}
+.star.bright{background:radial-gradient(circle,#fff,#c8d8ff 40%,transparent 70%);animation:glowStar ease-in-out infinite;}
+@keyframes glowStar{0%,100%{opacity:0.3;transform:scale(1);box-shadow:0 0 2px #fff;}40%{opacity:1;transform:scale(2.5);box-shadow:0 0 8px #c8d8ff,0 0 20px rgba(180,200,255,0.4);}70%{opacity:0.5;transform:scale(1.5);box-shadow:0 0 4px #fff;}}
+.shooting-star{position:absolute;width:2px;height:2px;background:white;border-radius:50%;animation:shoot linear infinite;opacity:0;}
+.shooting-star::after{content:'';position:absolute;top:50%;right:0;width:60px;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.8),transparent);transform:translateY(-50%);}
+@keyframes shoot{
+  0%{opacity:0;transform:translate(0,0) rotate(-35deg);}
+  5%{opacity:1;}
+  15%{opacity:0;transform:translate(-300px,200px) rotate(-35deg);}
+  100%{opacity:0;transform:translate(-300px,200px) rotate(-35deg);}
+}
+
+/* Journal wrapper - perspective comes from here */
+.journal-wrap{
+  width:min(720px,93vw);height:min(500px,78vh);position:relative;z-index:1;
+  perspective:1200px;
+  animation:settle 0.8s ease both;
+}
+@keyframes settle{from{transform:rotateX(30deg) translateY(80px);opacity:0;}to{transform:rotateX(2deg);opacity:1;}}
+
+/* Binding */
+.binding{
+  position:absolute;inset:-10px -6px -10px -6px;
+  background:linear-gradient(175deg,#1e2a4a,#182040 20%,#101830 50%,#182040 80%,#1e2a4a);
+  border-radius:8px 22px 22px 8px;
+  box-shadow:0 10px 40px rgba(0,0,0,0.6),0 3px 8px rgba(0,0,0,0.4);
+}
+.binding::after{content:'';position:absolute;inset:16px;border:2px solid rgba(140,150,190,0.2);border-radius:4px 14px 14px 4px;pointer-events:none;}
+
+.spine{position:absolute;left:50%;top:-10px;bottom:-10px;width:10px;transform:translateX(-50%);background:linear-gradient(90deg,#101830,#080c20,#101830);border-radius:3px;z-index:10;}
+
+/* Cover */
+.cover-flap{
+  position:absolute;inset:-10px -6px -10px -6px;z-index:20;
+  background:linear-gradient(175deg,#1e2a4a,#182040 20%,#101830 50%,#182040 80%,#1e2a4a);
+  border-radius:8px 22px 22px 8px;
+  transform-origin:left center;
+  box-shadow:0 10px 40px rgba(0,0,0,0.6);
+  animation:openCover 1.2s 0.15s cubic-bezier(0.4,0,0.2,1) forwards;
+}
+.cover-flap::after{content:'';position:absolute;inset:16px;border:2px solid rgba(140,150,190,0.2);border-radius:4px 14px 14px 4px;}
+@keyframes openCover{from{transform:rotateY(0deg);}to{transform:rotateY(-155deg);}}
+
+/* Open book */
+.book-open{
+  position:absolute;inset:0;display:flex;
+  border-radius:2px 18px 18px 2px;overflow:hidden;
+  animation:reveal 0.4s 0.6s ease both;opacity:0;
+}
+@keyframes reveal{to{opacity:1;}}
+
+/* Left page */
+.pg-l{
+  width:50%;height:100%;padding:38px 28px 28px;
+  background:var(--paper);
+  background-image:repeating-linear-gradient(transparent,transparent 34px,var(--line) 34px,var(--line) 35px);
+  background-position:0 64px;
+  overflow-y:auto;position:relative;z-index:1;
+}
+.pg-l::-webkit-scrollbar{width:3px;}.pg-l::-webkit-scrollbar-thumb{background:rgba(100,100,140,0.06);border-radius:10px;}
+
+/* Right page container */
+.pg-r-wrap{width:50%;height:100%;position:relative;z-index:1;}
+
+/* Static right page underneath */
+.pg-r-under{
+  position:absolute;inset:0;padding:38px 28px 28px;
+  background:var(--paper-r);
+  background-image:repeating-linear-gradient(transparent,transparent 34px,#dddbe4 34px,#dddbe4 35px);
+  background-position:0 64px;
+  overflow-y:auto;
+}
+.pg-r-under::-webkit-scrollbar{width:3px;}.pg-r-under::-webkit-scrollbar-thumb{background:rgba(100,100,140,0.06);border-radius:10px;}
+
+/* === THE TURNING PAGE - animated via JS === */
+.turning-page{
+  position:absolute;inset:0;z-index:5;
+  transform-origin:left center;transform-style:preserve-3d;
+  /* Shadow for depth */
+  filter:drop-shadow(-5px 3px 10px rgba(0,0,0,0.35));
+}
+.tp-front,.tp-back{
+  position:absolute;inset:0;overflow-y:auto;padding:38px 28px 28px;
+  backface-visibility:hidden;
+  background-image:repeating-linear-gradient(transparent,transparent 34px,#dddbe4 34px,#dddbe4 35px);
+  background-position:0 64px;
+}
+.tp-front{background-color:var(--paper-r);border-radius:0 16px 0 0;}
+.tp-back{background-color:var(--paper);border-radius:2px 0 0 0;transform:rotateY(180deg);background-image:repeating-linear-gradient(transparent,transparent 34px,var(--line) 34px,var(--line) 35px);}
+
+/* ===== CONTENT ===== */
+.hd{font-size:0.6rem;color:var(--grey);letter-spacing:3px;margin-bottom:14px;padding-bottom:5px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-end;}
+.hd .dt{color:var(--ink);font-weight:500;letter-spacing:1px;font-size:0.68rem;}
+
+.write-area textarea{width:100%;border:none;outline:none;background:transparent;font-family:inherit;font-size:0.82rem;color:var(--ink);line-height:35px;resize:none;letter-spacing:0.3px;min-height:76px;}
+.write-area textarea::placeholder{color:#c0bdd0;}
+.mood-bar{display:flex;gap:5px;margin:10px 0;align-items:center;}
+.dot{width:24px;height:24px;border-radius:50%;border:1.5px solid transparent;background:transparent;cursor:pointer;font-size:0.78rem;display:flex;align-items:center;justify-content:center;opacity:0.35;transition:all 0.25s;}
+.dot:hover{opacity:0.8;transform:scale(1.12);}
+.dot.on{opacity:1;border-color:var(--silver);box-shadow:0 0 8px rgba(136,144,184,0.15);}
+.btn-save{margin-left:auto;padding:6px 22px;border-radius:15px;background:var(--ink);color:var(--paper);border:none;cursor:pointer;font-size:0.68rem;letter-spacing:3px;font-family:inherit;transition:all 0.3s;}
+.btn-save:hover{background:var(--silver);color:#fff;}
+
+.stat-bar{font-size:0.57rem;color:var(--grey);letter-spacing:2px;margin-bottom:12px;}.stat-bar b{color:var(--ink);font-weight:500;}
+
+.entry{margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed #e0dde8;animation:in 0.35s ease;}
+@keyframes in{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.entry .e-top{display:flex;align-items:center;gap:5px;margin-bottom:2px;}
+.entry .e-time{font-size:0.54rem;color:var(--grey);}
+.entry .e-mood{font-size:0.72rem;}
+.entry .e-text{font-size:0.7rem;color:var(--ink);line-height:35px;white-space:pre-wrap;letter-spacing:0.2px;}
+.entry .e-btns{display:flex;gap:5px;margin-top:3px;justify-content:flex-end;}
+.entry .e-btns button{background:none;border:none;color:#b8b5c8;cursor:pointer;font-size:0.48rem;padding:1px 4px;transition:color 0.2s;font-family:inherit;}
+.entry .e-btns button:hover.edit{color:var(--silver);}.entry .e-btns button:hover.del{color:#c07080;}
+.entry.editing .e-text{display:none;}.entry .edit-inline{display:none;}.entry.editing .edit-inline{display:block;}
+.edit-inline textarea{width:100%;border:1px solid #d8d5e0;background:rgba(255,255,255,0.3);font-family:inherit;font-size:0.7rem;color:var(--ink);outline:none;padding:4px 5px;border-radius:2px;line-height:35px;resize:vertical;min-height:42px;}
+.edit-inline .act-row{display:flex;gap:4px;margin-top:3px;}
+.edit-inline .act-row button{padding:2px 10px;border-radius:7px;border:none;cursor:pointer;font-size:0.53rem;font-family:inherit;letter-spacing:1px;}
+.edit-inline .act-row .ok{background:var(--ink);color:var(--paper);}.edit-inline .act-row .no{background:#eceaf0;color:var(--grey);}
+
+.pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:16px;padding-top:10px;border-top:1px solid var(--line);}
+.pg-btn{width:32px;height:32px;border-radius:50%;border:2px solid var(--silver);background:transparent;cursor:pointer;font-size:0.7rem;color:var(--silver);display:flex;align-items:center;justify-content:center;transition:all 0.2s;font-family:inherit;}
+.pg-btn:hover:not(:disabled){background:rgba(136,144,184,0.1);transform:scale(1.08);}
+.pg-btn:disabled{opacity:0.12;cursor:default;}
+.pg-info{font-size:0.56rem;color:var(--grey);letter-spacing:2px;}
+
+.empty{text-align:center;padding:50px 10px;color:#c8c5d8;font-size:0.72rem;line-height:2.2;}.empty .ico{font-size:1.8rem;display:block;margin-bottom:4px;opacity:0.45;}
+
+.chalk-overlay{position:fixed;inset:0;z-index:200;pointer-events:none;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s;}.chalk-overlay.show{opacity:1;}
+.chalk-msg{background:#1e2840;padding:14px 24px;border-radius:10px;border:4px solid #3a4470;color:#c0c8e0;font-family:'Courier New',monospace;font-size:0.75rem;letter-spacing:2px;box-shadow:0 6px 22px rgba(0,0,0,0.5);animation:chalk 0.8s steps(12) forwards;}
+@keyframes chalk{from{clip-path:inset(0 100% 0 0);}to{clip-path:inset(0 0 0 0);}}
+.spark{position:fixed;pointer-events:none;z-index:190;border-radius:50%;animation:sparkUp 1.6s ease-out forwards;}
+@keyframes sparkUp{0%{opacity:1;transform:translate(0,0) scale(1.1);}100%{opacity:0;transform:translate(var(--sx),var(--sy)) scale(0);}}
+
+@media(max-width:600px){
+  .journal-wrap{width:96vw;height:min(460px,74vh);}
+  .pg-l,.pg-r-under,.tp-front,.tp-back{padding:26px 16px 22px;}
+  .write-area textarea{font-size:0.76rem;line-height:34px;min-height:56px;}
+}
+</style>
+</head>
+<body>
+<div class="stars" id="stars"></div>
+
+<div class="journal-wrap" id="journal">
+  <div class="binding"></div><div class="spine"></div>
+  <div class="cover-flap"></div>
+
+  <div class="book-open">
+    <!-- LEFT PAGE -->
+    <div class="pg-l">
+      <div class="hd"><span>今天</span><span class="dt" id="todayDate"></span></div>
+      <div class="write-area">
+        <textarea id="inputText" placeholder="写点什么…" rows="2"></textarea>
+        <div class="mood-bar">
+          <button class="dot on" id="mdSunny" onclick="setMood('sunny')">☀️</button>
+          <button class="dot" id="mdCloudy" onclick="setMood('cloudy')">☁️</button>
+          <button class="dot" id="mdRainy" onclick="setMood('rainy')">🌧️</button>
+          <button class="dot" id="mdSnowy" onclick="setMood('snowy')">❄️</button>
+          <button class="btn-save" onclick="saveIt()">记下</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PAGE AREA -->
+    <div class="pg-r-wrap">
+      <!-- Static page underneath -->
+      <div class="pg-r-under">
+        <div class="hd"><span>记忆</span><span class="dt" id="statsStrip"></span></div>
+        <div id="entriesBox"></div>
+        <div class="pager" id="pagination"></div>
+        <div class="empty" id="emptyRight"><span class="ico">📖</span></div>
+      </div>
+      <!-- Turning page overlay -->
+      <div class="turning-page" id="turningPage">
+        <div class="tp-front"><div class="hd"><span>记忆</span></div><div id="tpFront"></div></div>
+        <div class="tp-back"><div class="hd"><span>记忆</span></div><div id="tpBack"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="chalk-overlay" id="chalkOverlay"><div class="chalk-msg" id="chalkMsg"></div></div>
+
+<script>
+// Stars - dense field + bright stars + shooting stars
+(function(){
+  const c=document.getElementById('stars');
+  // Tiny background stars (dense)
+  for(let i=0;i<80;i++){const s=document.createElement('div');s.className='star';const sz=1+Math.random()*1.5;s.style.width=sz+'px';s.style.height=sz+'px';s.style.left=Math.random()*100+'%';s.style.top=Math.random()*100+'%';s.style.animationDuration=(2.5+Math.random()*5)+'s';s.style.animationDelay=Math.random()*5+'s';c.appendChild(s);}
+  // Bright glowing stars (fewer, bigger)
+  for(let i=0;i<15;i++){const s=document.createElement('div');s.className='star bright';const sz=2+Math.random()*3;s.style.width=sz+'px';s.style.height=sz+'px';s.style.left=Math.random()*100+'%';s.style.top=Math.random()*100+'%';s.style.animationDuration=(3+Math.random()*6)+'s';s.style.animationDelay=Math.random()*6+'s';c.appendChild(s);}
+  // Shooting stars
+  for(let i=0;i<3;i++){const s=document.createElement('div');s.className='shooting-star';s.style.left=(10+Math.random()*70)+'%';s.style.top=(5+Math.random()*40)+'%';s.style.animationDuration=(6+Math.random()*12)+'s';s.style.animationDelay=(3+Math.random()*10)+'s';c.appendChild(s);}
+})();
+
+// Data
+const DEMO=[{id:'d1',text:'今天下雨，他带了一把黑色的伞。在便利店门口碰到，他说"刚好买多了咖啡"。递给我的那杯还是热的。',mood:'rainy',time:new Date(Date.now()-86400000*1).toISOString()},{id:'d2',text:'加班到很晚，手机亮了一下。他说"楼下等你"。我下去的时候他靠在车边，手里拎着宵夜。摩羯座是不说想你的，但他会来。',mood:'cloudy',time:new Date(Date.now()-86400000*2).toISOString()},{id:'d3',text:'在咖啡馆碰到，他戴着耳机在看什么报告。我在对面坐下，他摘了一只耳机递给我。里面放着我上次说好听的那首歌。',mood:'sunny',time:new Date(Date.now()-86400000*3).toISOString()},{id:'d4',text:'吵架了。后来他在厨房热牛奶，倒了两杯。一杯推到我面前。摩羯座的道歉：什么都不说，但牛奶是热的。',mood:'snowy',time:new Date(Date.now()-86400000*4).toISOString()},{id:'d5',text:'今天什么都没发生。他还是七点起床、八点出门。但我在玄关的便签上画了颗星星，他下面加了个句号。这就是我们的一天。',mood:'cloudy',time:new Date(Date.now()-86400000*5).toISOString()},{id:'d6',text:'第一次看到他笑出声。是因为我学他走路的样子。他笑了大概两秒，然后说"无聊"。但耳朵尖是红的。摩羯座就是这样的。',mood:'sunny',time:new Date(Date.now()-86400000*6).toISOString()},{id:'d7',text:'下雪了。他说"路滑，别骑车了"。然后绕了二十分钟的路来载我。车里空调开得很暖，但他那边的窗开了一条缝。',mood:'snowy',time:new Date(Date.now()-86400000*7).toISOString()}];
+
+const STORE='journal_blue2',N=5;
+let entries=[],mood='sunny',page=0,editingId=null,flipping=false;
+let flipAnimId=null;
+
+function load(){try{entries=JSON.parse(localStorage.getItem(STORE));if(!entries||!entries.length){entries=DEMO;persist();}}catch(e){entries=DEMO;persist();}entries.sort((a,b)=>new Date(b.time)-new Date(a.time));}
+function persist(){localStorage.setItem(STORE,JSON.stringify(entries));}
+function totalP(){return Math.max(1,Math.ceil(entries.length/N));}
+
+document.getElementById('todayDate').textContent=new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+
+window.setMood=function(m){mood=m;['sunny','cloudy','rainy','snowy'].forEach(k=>document.getElementById('md'+k.charAt(0).toUpperCase()+k.slice(1)).classList.toggle('on',k===m));};
+
+window.saveIt=function(){
+  const t=document.getElementById('inputText').value.trim();if(!t)return;
+  entries.unshift({id:Date.now().toString(36),text:t,mood,time:new Date().toISOString()});
+  persist();page=0;render();document.getElementById('inputText').value='';
+  const o=document.getElementById('chalkOverlay');document.getElementById('chalkMsg').textContent=t.slice(0,22)+(t.length>22?'…':'');o.classList.add('show');setTimeout(()=>o.classList.remove('show'),1000);
+  for(let i=0;i<14;i++){const s=document.createElement('div');s.className='spark';const z=2+Math.random()*3;s.style.width=z+'px';s.style.height=z+'px';s.style.background=`hsl(${220+Math.random()*30},60%,${60+Math.random()*35}%)`;s.style.left=(38+Math.random()*24)+'%';s.style.top=(26+Math.random()*24)+'%';s.style.setProperty('--sx',(Math.random()-0.5)*44+'px');s.style.setProperty('--sy',-(22+Math.random()*44)+'px');document.body.appendChild(s);setTimeout(()=>s.remove(),1700);}
+};
+
+window.delIt=function(id){entries=entries.filter(e=>e.id!==id);persist();if(page>=totalP())page=Math.max(0,totalP()-1);render();};
+window.editIt=function(id){editingId=id;render();};
+window.cancelEdit=function(){editingId=null;render();};
+window.saveEdit=function(id){const e=entries.find(e=>e.id===id);if(!e)return;e.text=(document.querySelector(`[data-e="${id}"]`)?.value||'').trim();persist();editingId=null;render();};
+
+// ===== JS-DRIVEN PAGE FLIP =====
+window.goPg=function(dir){
+  if(flipping)return;
+  const prev=page;
+  if(dir===-1&&page>0)page--;
+  if(dir===1&&page<totalP()-1)page++;
+  if(page===prev)return;
+
+  const tp=document.getElementById('turningPage');
+  const front=document.getElementById('tpFront');
+  const back=document.getElementById('tpBack');
+  const cur=entries.slice(prev*N,(prev+1)*N);
+  const nxt=entries.slice(page*N,(page+1)*N);
+
+  // Populate content
+  if(dir===1){
+    front.innerHTML=cur.map(e=>entryHTML(e)).join('');
+    back.innerHTML=nxt.map(e=>entryHTML(e)).join('');
+  }else{
+    front.innerHTML=nxt.map(e=>entryHTML(e)).join('');
+    back.innerHTML='';
+  }
+
+  // Cancel any ongoing animation
+  if(flipAnimId)cancelAnimationFrame(flipAnimId);
+  flipping=true;
+
+  // Animate with JS
+  const duration=500; // ms
+  const startTime=performance.now();
+  const startAngle=dir===1?0:-178;
+  const endAngle=dir===1?-178:0;
+
+  function step(now){
+    const elapsed=now-startTime;
+    const progress=Math.min(elapsed/duration,1);
+    // Ease in-out
+    const t=progress<0.5?2*progress*progress:-1+(4-2*progress)*progress;
+    const angle=startAngle+(endAngle-startAngle)*t;
+
+    // Apply transform directly
+    tp.style.transform=`rotateY(${angle}deg)`;
+
+    // At ~90°, switch visible content by making backface more prominent
+    // This is handled by the browser's backface-visibility
+
+    if(progress<1){
+      flipAnimId=requestAnimationFrame(step);
+    }else{
+      tp.style.transform=`rotateY(${endAngle}deg)`;
+      flipping=false;
+      flipAnimId=null;
+      render(); // Update the static page underneath
+      // Reset turning page to flat
+      setTimeout(()=>{tp.style.transform='rotateY(0deg)';},50);
+    }
+  }
+  flipAnimId=requestAnimationFrame(step);
+};
+
+function entryHTML(e,editing){
+  return editing?`<div class="entry editing"><div class="e-top"><span class="e-time">${fmt(e.time)}</span></div><div class="edit-inline"><textarea data-e="${e.id}" rows="2">${esc(e.text)}</textarea><div class="act-row"><button class="ok" onclick="saveEdit('${e.id}')">保存</button><button class="no" onclick="cancelEdit()">取消</button></div></div></div>`
+  :`<div class="entry"><div class="e-top"><span class="e-time">${fmt(e.time)}</span><span class="e-mood">${moji(e.mood)}</span></div><div class="e-text">${esc(e.text)}</div><div class="e-btns"><button class="edit" onclick="editIt('${e.id}')">✏️</button><button class="del" onclick="delIt('${e.id}')">🗑️</button></div></div>`;
+}
+function moji(m){return{sunny:'☀️',cloudy:'☁️',rainy:'🌧️',snowy:'❄️'}[m]||'☀️';}
+
+function render(){
+  const cp=entries.slice(page*N,(page+1)*N);
+  const $b=document.getElementById('entriesBox'),$p=document.getElementById('pagination');
+  document.getElementById('emptyRight').style.display='none';
+  $b.innerHTML=cp.map(e=>entryHTML(e,editingId===e.id)).join('');
+  const t=totalP();
+  $p.innerHTML=`<button class="pg-btn" ${page===0?'disabled':''} onclick="goPg(-1)">◀</button><span class="pg-info">${page+1} / ${t}</span><button class="pg-btn" ${page>=t-1?'disabled':''} onclick="goPg(1)">▶</button>`;
+  const days=new Set(entries.map(e=>e.time.slice(0,10))).size;
+  document.getElementById('statsStrip').innerHTML=`<b>${entries.length}</b> 篇 · <b>${days}</b> 天`;
+}
+
+function fmt(t){const d=new Date(t),n=new Date();if(d.toDateString()===n.toDateString())return'今天';const y=new Date(n);y.setDate(y.getDate()-1);if(d.toDateString()===y.toDateString())return'昨天';return d.toLocaleDateString('zh-CN',{month:'numeric',day:'numeric'});}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+document.getElementById('inputText').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveIt();}});
+
+load();render();
+</script>
+</body>
+</html>
